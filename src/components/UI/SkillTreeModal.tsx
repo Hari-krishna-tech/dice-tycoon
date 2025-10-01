@@ -127,7 +127,7 @@ const SkillTreeModal: React.FC = () => {
     const nodeSize = isMobile ? 'w-12 h-12' : 'w-16 h-16';
     const borderWidth = isMobile ? 'border-2' : 'border-4';
     const textSize = isMobile ? 'text-xs' : 'text-xs';
-    const baseStyle = `${nodeSize} ${borderWidth} rounded-lg flex items-center justify-center text-white font-bold ${textSize} transition-all duration-200`;
+    const baseStyle = `${nodeSize} ${borderWidth} rounded-lg flex items-center justify-center text-white font-bold ${textSize} transition-all duration-200 relative`;
     
     switch (status) {
       case 'available':
@@ -263,37 +263,80 @@ const SkillTreeModal: React.FC = () => {
                           <div className="text-lg">{getNodeIcon(node.id)}</div>
                           {status === 'locked' && <div className="text-xs">🔒</div>}
                         </div>
+                        {/* Cost badge: mobile-only, show for all nodes */}
+                        {isMobile && def.cost > 0 && (
+                          <div
+                            className={`absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-2 bg-black/70 border border-yellow-400 text-yellow-200 rounded-md px-2 py-0.5 shadow-sm text-[11px] flex items-center gap-1`}
+                          >
+                            <span className="leading-none">🪙</span>
+                            <span className="leading-none">{def.cost}</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Node label */}
-                      <div className="text-white text-xs text-center mt-1 max-w-20">
-                        {def.name.split(' ')[0]}
-                      </div>
+                      {isMobile ? (
+                        <div className="text-white text-xs text-center mt-1 whitespace-normal break-words leading-tight -px-10 py-1">
+                          {def.name}
+                        </div>
+                      ) : (
+                        <div className="text-white text-xs text-center mt-1 max-w-20 truncate">
+                          {def.name.split(' ')[0]}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
 
-                {/* Tooltip inside centered graph, clamped to container bounds */}
+                {/* Tooltip inside centered graph, smart-positioned to avoid overlap and clamped to container */}
                 {hoveredNode && SKILL_DEFINITIONS.find(s=>s.id===hoveredNode) && (() => {
                   const n = visibleNodes.find(n => n.id === hoveredNode) || treeLayout.find(n => n.id === hoveredNode);
                   if (!n) return null;
                   const containerW = layoutMetrics.width + padding * 2;
                   const containerH = layoutMetrics.height + padding * 2;
-                  const nodeX = (n.x - layoutMetrics.minX) + padding;
-                  const nodeY = (n.y - layoutMetrics.minY) + padding;
+                  const nodeX = (n.x - layoutMetrics.minX) + padding; // node center X
+                  const nodeY = (n.y - layoutMetrics.minY) + padding; // node center Y
+                  const nodeRadius = isMobile ? 24 : 32;
+                  const gap = 12; // space between node and tooltip
                   const estTooltipW = isMobile ? 200 : 320;
                   const estTooltipH = isMobile ? 100 : 140;
-                  // Offset tooltip to the right of the node (avoid overlap) with small vertical offset
-                  const desiredLeft = nodeX + (isMobile ? 60 : 80);
-                  const desiredTop = nodeY - (isMobile ? 20 : 0);
-                  const left = Math.max(8, Math.min(desiredLeft, containerW - estTooltipW - 8));
-                  const top = Math.max(8, Math.min(desiredTop, containerH - estTooltipH - 8));
+
+                  // Candidate placements: right, left, above, below
+                  const candidates = [
+                    { // right of node
+                      left: nodeX + nodeRadius + gap,
+                      top: nodeY - estTooltipH / 2,
+                    },
+                    { // left of node
+                      left: nodeX - nodeRadius - gap - estTooltipW,
+                      top: nodeY - estTooltipH / 2,
+                    },
+                    { // above node
+                      left: nodeX - estTooltipW / 2,
+                      top: nodeY - nodeRadius - gap - estTooltipH,
+                    },
+                    { // below node
+                      left: nodeX - estTooltipW / 2,
+                      top: nodeY + nodeRadius + gap,
+                    },
+                  ];
+
+                  const fitsWithin = (c: { left: number; top: number }) =>
+                    c.left >= 8 && c.top >= 8 &&
+                    c.left + estTooltipW <= containerW - 8 &&
+                    c.top + estTooltipH <= containerH - 8;
+
+                  const chosen = candidates.find(fitsWithin) || {
+                    left: Math.max(8, Math.min(nodeX + nodeRadius + gap, containerW - estTooltipW - 8)),
+                    top: Math.max(8, Math.min(nodeY - estTooltipH / 2, containerH - estTooltipH - 8)),
+                  };
+
                   return (
                     <div
-                      className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm z-50 pointer-events-none ${
+                      className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm z-50 pointer-events-none opacity-80 ${
                         isMobile ? 'text-center' : ''
                       }`}
-                      style={{ left, top, maxWidth: isMobile ? 200 : 320 }}
+                      style={{ left: chosen.left, top: chosen.top, maxWidth: isMobile ? 200 : 320 }}
                     >
                       <div className="font-bold text-yellow-400 mb-1">
                         {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.name}

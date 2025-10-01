@@ -283,13 +283,14 @@ const SkillTreeModal: React.FC = () => {
                   const nodeY = (n.y - layoutMetrics.minY) + padding;
                   const estTooltipW = isMobile ? 200 : 320;
                   const estTooltipH = isMobile ? 100 : 140;
-                  const desiredLeft = nodeX + (isMobile ? 30 : 50);
-                  const desiredTop = nodeY - (isMobile ? 50 : 60);
+                  // Offset tooltip to the right of the node (avoid overlap) with small vertical offset
+                  const desiredLeft = nodeX + (isMobile ? 60 : 80);
+                  const desiredTop = nodeY - (isMobile ? 20 : 0);
                   const left = Math.max(8, Math.min(desiredLeft, containerW - estTooltipW - 8));
                   const top = Math.max(8, Math.min(desiredTop, containerH - estTooltipH - 8));
                   return (
                     <div
-                      className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm z-50 ${
+                      className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm z-50 pointer-events-none ${
                         isMobile ? 'text-center' : ''
                       }`}
                       style={{ left, top, maxWidth: isMobile ? 200 : 320 }}

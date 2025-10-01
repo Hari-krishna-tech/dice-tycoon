@@ -32,6 +32,14 @@ const DICE_SIZES = {
   emerald: 60,
 };
 
+const MOBILE_DICE_SIZES = {
+  steel: 25,
+  copper: 28,
+  silver: 30,
+  gold: 32,
+  emerald: 35,
+};
+
 const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
   const groupRef = useRef<any>(null);
   const [currentRollingFace, setCurrentRollingFace] = useState<number>(1);
@@ -40,7 +48,8 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
   const [isActuallyRolling, setIsActuallyRolling] = useState(false);
   const { updateDiePosition } = useGameStore();
 
-  const size = DICE_SIZES[die.tier];
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const size = isMobile ? MOBILE_DICE_SIZES[die.tier] : DICE_SIZES[die.tier];
   const color = DICE_COLORS[die.tier];
 
   // Realistic rolling animation with multiple face changes
@@ -86,25 +95,40 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
       const originalY = die.y;
       
       // Calculate final position immediately with canvas bounds
-      const canvasWidth = 800; // Match your canvas width
-      const canvasHeight = 500; // Match your canvas height
-      const margin = 60; // Keep dice within bounds
-      const maxMovement = 60; // Maximum movement distance
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+      let canvasWidth, canvasHeight;
+      if (isMobile) {
+        canvasWidth = Math.max(window.innerWidth - 16, 280); // More conservative
+        canvasHeight = Math.max(window.innerHeight - 200, 200); // Much more conservative to avoid controls
+      } else {
+        canvasWidth = Math.min(window.innerWidth * 0.7, 800);
+        canvasHeight = Math.min(window.innerHeight * 0.6, 500);
+      }
+      const margin = isMobile ? 30 : 60; // Larger margin for mobile
+      const maxMovement = isMobile ? 20 : 60; // Smaller movement for mobile
+      
+      // Calculate safe movement range with proper bounds
+      const dieSize = isMobile ? 40 : 60; // Match store calculation
+      const minX = margin;
+      const maxX = Math.max(margin + dieSize, canvasWidth - margin - dieSize);
+      const minY = margin;
+      const maxY = Math.max(margin + dieSize, canvasHeight - margin - dieSize);
       
       // Calculate safe movement range
       const maxOffsetX = Math.min(
         maxMovement, 
-        canvasWidth - originalX - margin, 
-        originalX - margin
+        maxX - originalX, 
+        originalX - minX
       );
       const maxOffsetY = Math.min(
         maxMovement, 
-        canvasHeight - originalY - margin, 
-        originalY - margin
+        maxY - originalY, 
+        originalY - minY
       );
       
-      const finalX = originalX + (Math.random() - 0.5) * maxOffsetX;
-      const finalY = originalY + (Math.random() - 0.5) * maxOffsetY;
+      // Ensure final position is within bounds
+      const finalX = Math.max(minX, Math.min(maxX, originalX + (Math.random() - 0.5) * maxOffsetX));
+      const finalY = Math.max(minY, Math.min(maxY, originalY + (Math.random() - 0.5) * maxOffsetY));
       
       // Don't update store immediately - wait for animation to complete
       
@@ -151,8 +175,12 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
           const interpolatedY = originalY + (finalY - originalY) * progress;
           
           // Add tumbling effects
-          const newX = interpolatedX + (tumbleSide * rollDirection.x);
-          const newY = interpolatedY - (tumbleHeight * Math.abs(rollDirection.y));
+          let newX = interpolatedX + (tumbleSide * rollDirection.x);
+          let newY = interpolatedY - (tumbleHeight * Math.abs(rollDirection.y));
+          
+          // Clamp position to stay within bounds during animation
+          newX = Math.max(minX, Math.min(maxX, newX));
+          newY = Math.max(minY, Math.min(maxY, newY));
           
           // Force update position
           groupRef.current.setPosition({ x: newX, y: newY });
@@ -197,6 +225,13 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
   }, [die.isRolling, die.x, die.y, rollDirection]);
 
   const handleClick = (e: any) => {
+    e.cancelBubble = true;
+    if (!die.isRolling) {
+      onRoll(die.id);
+    }
+  };
+
+  const handleTouchStart = (e: any) => {
     e.cancelBubble = true;
     if (!die.isRolling) {
       onRoll(die.id);
@@ -264,6 +299,7 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
       x={die.x}
       y={die.y}
       onClick={handleClick}
+      onTouchStart={handleTouchStart}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

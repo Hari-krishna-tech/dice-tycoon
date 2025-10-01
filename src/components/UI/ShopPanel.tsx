@@ -24,7 +24,7 @@ const ShopPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 relative overflow-hidden">
+    <div className="relative overflow-hidden">
       {/* Cosmic background effect */}
       <div className="absolute inset-0 opacity-5">
         {Array.from({ length: 15 }).map((_, i) => (
@@ -40,38 +40,35 @@ const ShopPanel: React.FC = () => {
         ))}
       </div>
       
-      <h3 className="text-lg font-bold text-white mb-4 relative z-10">Cosmic Dice Shop</h3>
-      
-      <div className="space-y-3 relative z-10">
+      <div className="space-y-1 relative z-10 lg:block flex space-x-2 lg:space-x-0 lg:space-y-1">
         {Object.entries(diceTiers)
           .filter(([_, tier]) => tier.unlocked)
           .map(([tierKey, tier]) => (
-          <div key={tierKey} className="bg-gradient-to-r from-gray-700 to-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <h4 className="font-semibold text-white">{tier.name} Die</h4>
-                <p className="text-sm text-gray-300">
-                  {tier.multiplier}x multiplier • {tier.count} owned
+          <div key={tierKey} className="bg-gradient-to-r from-gray-700 to-gray-800 border border-gray-600 rounded-lg p-1 shadow-lg lg:w-full w-32 flex-shrink-0">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-1">
+              <div className="flex-1">
+                <h4 className="font-semibold text-white text-xs truncate">{tier.name} Die</h4>
+                <p className="text-xs text-gray-300">
+                  {tier.multiplier}x • {tier.count}
                 </p>
               </div>
-              <div className="text-right">
-                <div className="text-lg font-bold text-yellow-400 font-mono">
+              <div className="text-right lg:block">
+                <div className="text-xs lg:text-sm font-bold text-yellow-400 font-mono">
                   {getDiceCost(tierKey).toLocaleString()}
                 </div>
-                <div className="text-sm text-yellow-200">Gold</div>
               </div>
             </div>
             
             <button
               onClick={() => spawnDie(tierKey)}
               disabled={!canAfford(tierKey)}
-              className={`w-full py-2 px-4 rounded-lg font-semibold transition-all duration-200 shadow-lg ${
+              className={`w-full py-1 px-2 rounded-lg font-semibold transition-all duration-200 shadow-lg text-xs min-h-[32px] flex items-center justify-center ${
                 canAfford(tierKey)
                   ? TIER_COLORS[tierKey as keyof typeof TIER_COLORS] + ' text-white hover:shadow-lg'
                   : 'bg-gray-600 text-gray-400 cursor-not-allowed'
               }`}
             >
-              {canAfford(tierKey) ? 'Spawn Die' : 'Not Enough Gold'}
+              {canAfford(tierKey) ? 'Spawn' : 'No Gold'}
             </button>
           </div>
         ))}

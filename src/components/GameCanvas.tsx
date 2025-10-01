@@ -22,23 +22,67 @@ interface GoldPopup {
 }
 
 const GameCanvas: React.FC = () => {
-  const { dice, rollDie } = useGameStore();
+  const { dice, rollDie, updateDiePosition } = useGameStore();
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [ripples, setRipples] = useState<RippleEffect[]>([]);
   const [goldPopups, setGoldPopups] = useState<GoldPopup[]>([]);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
 
   useEffect(() => {
     const updateDimensions = () => {
-      setDimensions({
-        width: Math.min(window.innerWidth * 0.7, 800),
-        height: Math.min(window.innerHeight * 0.6, 500)
-      });
+      const nextIsMobile = window.innerWidth < 1024; // lg breakpoint
+      setIsMobile(nextIsMobile);
+      if (nextIsMobile) {
+        // Mobile: Use much more conservative dimensions to avoid overlap with controls
+        const containerWidth = window.innerWidth - 16; // More padding
+        const containerHeight = window.innerHeight - 200; // Much more conservative height to avoid controls
+        
+        setDimensions({
+          width: Math.max(containerWidth, 280),
+          height: Math.max(containerHeight, 200) // Much smaller minimum height
+        });
+      } else {
+        // Desktop: Original sizing
+        setDimensions({
+          width: Math.min(window.innerWidth * 0.7, 800),
+          height: Math.min(window.innerHeight * 0.6, 500)
+        });
+      }
     };
 
     updateDimensions();
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // Detect breakpoint changes and restore saved layout-specific positions
+  useEffect(() => {
+    dice.forEach((d) => {
+      if (isMobile && d.mobileX != null && d.mobileY != null) {
+        updateDiePosition(d.id, d.mobileX, d.mobileY);
+      } else if (!isMobile && d.desktopX != null && d.desktopY != null) {
+        updateDiePosition(d.id, d.desktopX, d.desktopY);
+      }
+    });
+  }, [isMobile]);
+
+  // Clamp all dice within the visible canvas whenever dimensions change or dice count changes
+  useEffect(() => {
+    const margin = isMobile ? 30 : 60; // Larger margin for mobile
+    const dieSize = isMobile ? 40 : 60; // Account for largest die size with buffer
+    const minX = margin;
+    const maxX = Math.max(margin + dieSize, dimensions.width - margin - dieSize);
+    const minY = margin;
+    const maxY = Math.max(margin + dieSize, dimensions.height - margin - dieSize);
+
+    dice.forEach((d) => {
+      const clampedX = Math.min(Math.max(d.x, minX), maxX);
+      const clampedY = Math.min(Math.max(d.y, minY), maxY);
+      if (clampedX !== d.x || clampedY !== d.y) {
+        updateDiePosition(d.id, clampedX, clampedY);
+      }
+    });
+  }, [dimensions.width, dimensions.height, dice.length, isMobile]);
 
   // Handle dice roll with background effects
   const handleDiceRoll = (dieId: string) => {
@@ -197,7 +241,12 @@ const GameCanvas: React.FC = () => {
         );
       })}
 
-      <Stage width={dimensions.width} height={dimensions.height} className="rounded-lg relative z-10">
+      <Stage 
+        width={dimensions.width} 
+        height={dimensions.height} 
+        className="rounded-lg relative z-10"
+        style={{ touchAction: 'none' }}
+      >
         <Layer>
           {dice.map((die) => (
             <Dice

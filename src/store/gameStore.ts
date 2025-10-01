@@ -6,6 +6,11 @@ export interface Die {
   tier: 'steel' | 'copper' | 'silver' | 'gold' | 'emerald';
   x: number;
   y: number;
+  // Persist last-known positions for each layout so we can restore across breakpoints
+  desktopX?: number;
+  desktopY?: number;
+  mobileX?: number;
+  mobileY?: number;
   currentFace: number;
   isRolling: boolean;
   lastRollTime: number;
@@ -206,11 +211,55 @@ export const useGameStore = create<GameState>()(
         const cost = Math.floor(diceTier.baseCost * Math.pow(1.15, diceTier.count));
         
         if (state.spendGold(cost)) {
+          const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+          
+          // Use more conservative canvas dimensions for mobile
+          let canvasWidth, canvasHeight;
+          if (isMobile) {
+            // Much more conservative mobile dimensions to avoid controls
+            canvasWidth = Math.max(window.innerWidth - 16, 280); // More padding
+            canvasHeight = Math.max(window.innerHeight - 200, 200); // Much more conservative height
+          } else {
+            canvasWidth = Math.min(window.innerWidth * 0.7, 800);
+            canvasHeight = Math.min(window.innerHeight * 0.6, 500);
+          }
+          
+          const margin = isMobile ? 30 : 60; // Larger margin for mobile
+          const dieSize = isMobile ? 40 : 60; // Account for largest die size with some buffer
+
+          const minX = margin;
+          const maxX = Math.max(margin + dieSize, canvasWidth - margin - dieSize);
+          const minY = margin;
+          const maxY = Math.max(margin + dieSize, canvasHeight - margin - dieSize);
+
+
+          // Ensure we have valid bounds
+          let randX, randY;
+          if (maxX <= minX || maxY <= minY) {
+            // Fallback to center if bounds are invalid
+            randX = Math.max(margin, Math.min(canvasWidth - margin - dieSize, canvasWidth / 2));
+            randY = Math.max(margin, Math.min(canvasHeight - margin - dieSize, canvasHeight / 2));
+          } else {
+            randX = Math.random() * (maxX - minX) + minX;
+            randY = Math.random() * (maxY - minY) + minY;
+          }
+          
+          // Final safety clamp
+          randX = Math.max(margin, Math.min(canvasWidth - margin - dieSize, randX));
+          randY = Math.max(margin, Math.min(canvasHeight - margin - dieSize, randY));
+          
+          const initialX = randX;
+          const initialY = randY;
+
           const newDie: Die = {
             id: `${tier}-${Date.now()}-${Math.random()}`,
             tier: tier as any,
-            x: Math.random() * 600 + 50, // Random position in canvas
-            y: Math.random() * 400 + 50,
+            x: initialX,
+            y: initialY,
+            desktopX: isMobile ? undefined : initialX,
+            desktopY: isMobile ? undefined : initialY,
+            mobileX: isMobile ? initialX : undefined,
+            mobileY: isMobile ? initialY : undefined,
             currentFace: 1,
             isRolling: false,
             lastRollTime: 0,
@@ -277,10 +326,20 @@ export const useGameStore = create<GameState>()(
       },
 
       updateDiePosition: (dieId: string, x: number, y: number) => {
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
         set((state) => ({
-          dice: state.dice.map(d => 
-            d.id === dieId ? { ...d, x, y } : d
-          ),
+          dice: state.dice.map(d => {
+            if (d.id !== dieId) return d;
+            return {
+              ...d,
+              x,
+              y,
+              desktopX: isMobile ? d.desktopX : x,
+              desktopY: isMobile ? d.desktopY : y,
+              mobileX: isMobile ? x : d.mobileX,
+              mobileY: isMobile ? y : d.mobileY,
+            };
+          }),
         }));
       },
 

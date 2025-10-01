@@ -7,7 +7,7 @@ const HUD: React.FC = () => {
   const { gold } = useGameStore();
 
   return (
-    <div className="bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 mb-4 relative overflow-hidden">
+    <div className="bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 rounded-lg shadow-xl p-1 lg:p-2 relative overflow-hidden">
       {/* Cosmic background effect */}
       <div className="absolute inset-0 opacity-10">
         {Array.from({ length: 20 }).map((_, i) => (
@@ -24,10 +24,10 @@ const HUD: React.FC = () => {
       </div>
       
       <div className="text-center relative z-10">
-        <div className="text-4xl font-bold text-yellow-400 font-mono drop-shadow-lg">
+        <div className="text-sm lg:text-xl font-bold text-yellow-400 font-mono drop-shadow-lg">
           {gold.toLocaleString()}
         </div>
-        <div className="text-sm text-yellow-200 font-semibold">Cosmic Gold</div>
+        <div className="text-xs text-yellow-200 font-semibold">Gold</div>
       </div>
     </div>
   );

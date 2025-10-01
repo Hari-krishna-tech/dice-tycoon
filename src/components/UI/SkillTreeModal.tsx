@@ -14,8 +14,19 @@ const SkillTreeModal: React.FC = () => {
   const { skillTreeOpen, toggleSkillTree, upgrades, gold, purchaseUpgrade } = useGameStore();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Define the visual tree layout
-  const treeLayout: TreeNode[] = [
+  // Define the visual tree layout - responsive positioning
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const treeLayout: TreeNode[] = isMobile ? [
+    // Mobile layout - optimized for full screen
+    { id: 'steelMultiplier', x: window.innerWidth / 2 - 24, y: 80, tier: 0 },
+    { id: 'unlockCopper', x: window.innerWidth / 2 - 80, y: 160, tier: 1 },
+    { id: 'luckyRolls', x: window.innerWidth / 2 + 32, y: 160, tier: 1 },
+    { id: 'copperMultiplier', x: window.innerWidth / 2 - 120, y: 240, tier: 2 },
+    { id: 'rollSpeed', x: window.innerWidth / 2 - 40, y: 240, tier: 2 },
+    { id: 'sixesBonus', x: window.innerWidth / 2 + 40, y: 240, tier: 2 },
+    { id: 'hoverRadius', x: window.innerWidth / 2 + 120, y: 240, tier: 2 },
+  ] : [
+    // Desktop layout - original
     { id: 'steelMultiplier', x: 200, y: 100, tier: 0 },
     { id: 'unlockCopper', x: 100, y: 200, tier: 1 },
     { id: 'luckyRolls', x: 300, y: 200, tier: 1 },
@@ -55,7 +66,10 @@ const SkillTreeModal: React.FC = () => {
   };
 
   const getNodeStyle = (status: string) => {
-    const baseStyle = 'w-16 h-16 border-4 rounded-lg flex items-center justify-center text-white font-bold text-xs transition-all duration-200';
+    const nodeSize = isMobile ? 'w-12 h-12' : 'w-16 h-16';
+    const borderWidth = isMobile ? 'border-2' : 'border-4';
+    const textSize = isMobile ? 'text-xs' : 'text-xs';
+    const baseStyle = `${nodeSize} ${borderWidth} rounded-lg flex items-center justify-center text-white font-bold ${textSize} transition-all duration-200`;
     
     switch (status) {
       case 'available':
@@ -105,8 +119,12 @@ const SkillTreeModal: React.FC = () => {
   const connections = getConnections();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden relative">
+    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${isMobile ? 'p-0' : 'p-2 sm:p-4'}`}>
+      <div className={`bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 shadow-xl overflow-hidden relative ${
+        isMobile 
+          ? 'w-full h-full rounded-none' 
+          : 'rounded-lg max-w-6xl w-full max-h-[95vh]'
+      }`}>
         {/* Starry background */}
         <div className="absolute inset-0 opacity-30">
           {Array.from({ length: 50 }).map((_, i) => (
@@ -122,30 +140,36 @@ const SkillTreeModal: React.FC = () => {
           ))}
         </div>
 
-        <div className="relative z-10 p-6">
-          <div className="flex justify-between items-center mb-6">
+        <div className={`relative z-10 ${isMobile ? 'p-4 h-full flex flex-col' : 'p-3 sm:p-6'}`}>
+          <div className={`flex justify-between items-center ${isMobile ? 'mb-4' : 'mb-4 sm:mb-6'}`}>
             <div className="text-white">
-              <h2 className="text-3xl font-bold mb-2">Skill Tree</h2>
-              <div className="text-yellow-400 text-xl font-mono">
+              <h2 className={`${isMobile ? 'text-2xl' : 'text-xl sm:text-3xl'} font-bold mb-1 sm:mb-2`}>Skill Tree</h2>
+              <div className={`text-yellow-400 ${isMobile ? 'text-lg' : 'text-sm sm:text-xl'} font-mono`}>
                 {gold.toLocaleString()} Cosmic Gold
               </div>
             </div>
             <button
               onClick={toggleSkillTree}
-              className="text-white hover:text-red-400 text-3xl font-bold bg-red-600 hover:bg-red-700 w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+              className={`text-white hover:text-red-400 font-bold bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center transition-colors ${
+                isMobile ? 'text-2xl w-10 h-10' : 'text-2xl sm:text-3xl w-8 h-8 sm:w-10 sm:h-10'
+              }`}
             >
               ×
             </button>
           </div>
 
-          <div className="relative" style={{ height: '500px', width: '100%' }}>
+          <div className={`relative overflow-auto ${isMobile ? 'flex-1' : ''}`} style={{ 
+            height: isMobile ? 'calc(100vh - 120px)' : '400px', 
+            width: '100%' 
+          }}>
             {/* Connection lines */}
             <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
               {connections.map((connection, index) => {
+                const nodeCenter = isMobile ? 24 : 32;
                 const fromX = connection.from.x;
-                const fromY = connection.from.y + 32; // Center of node
+                const fromY = connection.from.y + nodeCenter; // Center of node
                 const toX = connection.to.x;
-                const toY = connection.to.y + 32;
+                const toY = connection.to.y + nodeCenter;
                 
                 return (
                   <line
@@ -175,8 +199,8 @@ const SkillTreeModal: React.FC = () => {
                   key={node.id}
                   className="absolute"
                   style={{
-                    left: node.x - 32,
-                    top: node.y - 32,
+                    left: node.x - (isMobile ? 24 : 32),
+                    top: node.y - (isMobile ? 24 : 32),
                     zIndex: 2,
                   }}
                 >
@@ -214,12 +238,14 @@ const SkillTreeModal: React.FC = () => {
             {/* Tooltip */}
             {hoveredNode && upgrades[hoveredNode] && (
               <div
-                className="absolute bg-gray-800 border border-gray-600 rounded-lg p-3 text-white text-sm max-w-64 z-50"
+                className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm max-w-48 sm:max-w-64 z-50 ${
+                  isMobile ? 'text-center' : ''
+                }`}
                 style={{
                   left: treeLayout.find(n => n.id === hoveredNode)?.x ? 
-                    Math.min(treeLayout.find(n => n.id === hoveredNode)!.x + 50, 400) : 0,
+                    Math.min(treeLayout.find(n => n.id === hoveredNode)!.x + (isMobile ? 30 : 50), isMobile ? 200 : 400) : 0,
                   top: treeLayout.find(n => n.id === hoveredNode)?.y ? 
-                    treeLayout.find(n => n.id === hoveredNode)!.y - 50 : 0,
+                    treeLayout.find(n => n.id === hoveredNode)!.y - (isMobile ? 40 : 50) : 0,
                 }}
               >
                 <div className="font-bold text-yellow-400 mb-1">

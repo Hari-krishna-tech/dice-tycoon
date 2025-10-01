@@ -52,7 +52,7 @@ export interface GameState {
   addGold: (amount: number) => void;
   spendGold: (amount: number) => boolean;
   spawnDie: (tier: string) => void;
-  rollDie: (dieId: string) => void;
+  rollDie: (dieId: string, rolledNumber?: number) => void;
   updateDiePosition: (dieId: string, x: number, y: number) => void;
   purchaseUpgrade: (upgradeId: string) => void;
   purchaseSkill: (skillId: string) => void;
@@ -264,7 +264,7 @@ export const useGameStore = create<GameState>()(
         }
       },
 
-      rollDie: (dieId: string) => {
+      rollDie: (dieId: string, rolledNumber?: number) => {
         const state = get();
         const die = state.dice.find(d => d.id === dieId);
         if (!die) return;
@@ -274,8 +274,10 @@ export const useGameStore = create<GameState>()(
 
         if (now - die.lastRollTime < cooldown) return;
 
-        // Calculate gold earned
-        const rolledNumber = Math.floor(Math.random() * 6) + 1;
+        // Use provided rolled number if given; otherwise generate
+        const finalRolledNumber = (typeof rolledNumber === 'number' && rolledNumber >= 1 && rolledNumber <= 6)
+          ? rolledNumber
+          : Math.floor(Math.random() * 6) + 1;
         const tierMultiplier = state.diceTiers[die.tier].multiplier;
         
         // Apply upgrades
@@ -286,29 +288,29 @@ export const useGameStore = create<GameState>()(
         if (state.upgrades.copperMultiplier && die.tier === 'copper') {
           globalMultiplier += state.upgrades.copperMultiplier.level * state.upgrades.copperMultiplier.effect;
         }
-        if (state.upgrades.sixesBonus && state.upgrades.sixesBonus.level > 0 && rolledNumber === 6) {
+        if (state.upgrades.sixesBonus && state.upgrades.sixesBonus.level > 0 && finalRolledNumber === 6) {
           globalMultiplier *= state.upgrades.sixesBonus.effect;
         }
 
-        const goldEarned = Math.floor(rolledNumber * tierMultiplier * globalMultiplier);
+        const goldEarned = Math.floor(finalRolledNumber * tierMultiplier * globalMultiplier);
 
         set((state) => ({
           dice: state.dice.map(d => 
             d.id === dieId 
-              ? { ...d, currentFace: rolledNumber, isRolling: true, lastRollTime: now }
+              ? { ...d, currentFace: finalRolledNumber, isRolling: true, lastRollTime: now }
               : d
           ),
           gold: state.gold + goldEarned,
         }));
 
-        // Stop rolling animation after a short delay
+        // Stop rolling animation after animation duration (600ms)
         setTimeout(() => {
           set((state) => ({
             dice: state.dice.map(d => 
               d.id === dieId ? { ...d, isRolling: false } : d
             ),
           }));
-        }, 200);
+        }, 600);
       },
 
       updateDiePosition: (dieId: string, x: number, y: number) => {

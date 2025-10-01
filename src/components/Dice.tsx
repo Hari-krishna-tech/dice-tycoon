@@ -13,7 +13,7 @@ interface DiceProps {
     currentFace: number;
     isRolling: boolean;
   };
-  onRoll: (dieId: string) => void;
+  onRoll: (dieId: string) => number;
 }
 
 const DICE_COLORS = {
@@ -30,26 +30,26 @@ const DICE_COLORS = {
 
 const DICE_SIZES = {
   steel: 40,
-  copper: 45,
-  silver: 50,
-  gold: 55,
-  emerald: 60,
-  platinum: 62,
-  diamond: 64,
-  ruby: 66,
-  obsidian: 68,
+  copper: 40,
+  silver: 40,
+  gold: 40,
+  emerald: 40,
+  platinum: 40,
+  diamond: 40,
+  ruby: 40,
+  obsidian: 40,
 };
 
 const MOBILE_DICE_SIZES = {
   steel: 25,
-  copper: 28,
-  silver: 30,
-  gold: 32,
-  emerald: 35,
-  platinum: 36,
-  diamond: 37,
-  ruby: 38,
-  obsidian: 39,
+  copper: 25,
+  silver: 25,
+  gold: 25,
+  emerald: 25,
+  platinum: 25,
+  diamond: 25,
+  ruby: 25,
+  obsidian: 25,
 };
 
 const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
@@ -239,14 +239,14 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
   const handleClick = (e: any) => {
     e.cancelBubble = true;
     if (!die.isRolling) {
-      onRoll(die.id);
+      setCurrentRollingFace(onRoll(die.id));
     }
   };
 
   const handleTouchStart = (e: any) => {
     e.cancelBubble = true;
     if (!die.isRolling) {
-      onRoll(die.id);
+      setCurrentRollingFace(onRoll(die.id));
     }
   };
 

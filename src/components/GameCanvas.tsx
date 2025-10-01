@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useGameStore } from '../store/gameStore';
 import Dice from './Dice';
+import { TIER_DEFINITIONS } from '@/store/data/tiers';
 
 interface RippleEffect {
   id: string;
@@ -85,7 +86,8 @@ const GameCanvas: React.FC = () => {
   }, [dimensions.width, dimensions.height, dice.length, isMobile]);
 
   // Handle dice roll with background effects
-  const handleDiceRoll = (dieId: string) => {
+  const handleDiceRoll = (dieId: string): number => {
+    let rolledNumber = 0;
     const die = dice.find(d => d.id === dieId);
     if (die) {
       // Create ripple effect
@@ -100,22 +102,17 @@ const GameCanvas: React.FC = () => {
       setRipples(prev => [...prev, newRipple]);
 
       // Calculate gold earned (same logic as in store)
-      const rolledNumber = Math.floor(Math.random() * 6) + 1;
-      const tierMultiplier = {
-        steel: 1,
-        copper: 5,
-        silver: 25,
-        gold: 150,
-        emerald: 1000
-      }[die.tier];
-      
+      rolledNumber = Math.floor(Math.random() * 6) + 1;
+      const tierMultiplier = TIER_DEFINITIONS[die.tier].multiplier;
+      console.log(tierMultiplier);
       // Apply upgrades (simplified version)
       let globalMultiplier = 1;
       // Note: In a real implementation, you'd get these from the store
       // For now, we'll use a simplified calculation
       
       const goldEarned = Math.floor(rolledNumber * tierMultiplier * globalMultiplier);
-
+      console.log("rolledNumber", rolledNumber);
+      console.log("goldEarned", goldEarned);
       // Remove ripple after animation
       setTimeout(() => {
         setRipples(prev => prev.filter(r => r.id !== rippleId));
@@ -139,9 +136,10 @@ const GameCanvas: React.FC = () => {
         }, 500); // Shorter duration
       }, 600); // Wait for die to land
 
-      // Trigger the actual dice roll
-      rollDie(dieId);
+      // Trigger the actual dice roll with the chosen number so UI matches
+      rollDie(dieId, rolledNumber);
     }
+    return rolledNumber;
   };
 
   return (

@@ -7,7 +7,7 @@ import { useGameStore } from '../store/gameStore';
 interface DiceProps {
   die: {
     id: string;
-    tier: 'steel' | 'copper' | 'silver' | 'gold' | 'emerald';
+    tier: 'steel' | 'copper' | 'silver' | 'gold' | 'emerald' | 'platinum' | 'diamond' | 'ruby' | 'obsidian';
     x: number;
     y: number;
     currentFace: number;
@@ -22,6 +22,10 @@ const DICE_COLORS = {
   silver: '#E5E5E5',
   gold: '#FFD700',
   emerald: '#50C878',
+  platinum: '#E5E4E2',
+  diamond: '#B9F2FF',
+  ruby: '#E0115F',
+  obsidian: '#2B2B2B',
 };
 
 const DICE_SIZES = {
@@ -30,6 +34,10 @@ const DICE_SIZES = {
   silver: 50,
   gold: 55,
   emerald: 60,
+  platinum: 62,
+  diamond: 64,
+  ruby: 66,
+  obsidian: 68,
 };
 
 const MOBILE_DICE_SIZES = {
@@ -38,6 +46,10 @@ const MOBILE_DICE_SIZES = {
   silver: 30,
   gold: 32,
   emerald: 35,
+  platinum: 36,
+  diamond: 37,
+  ruby: 38,
+  obsidian: 39,
 };
 
 const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {

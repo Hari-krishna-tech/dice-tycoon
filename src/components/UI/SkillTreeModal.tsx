@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
+import { SKILL_DEFINITIONS } from '../../store/data/skills';
 
 interface TreeNode {
   id: string;
@@ -11,57 +12,114 @@ interface TreeNode {
 }
 
 const SkillTreeModal: React.FC = () => {
-  const { skillTreeOpen, toggleSkillTree, upgrades, gold, purchaseUpgrade } = useGameStore();
+  const { skillTreeOpen, toggleSkillTree, gold, purchasedSkills, purchaseSkill } = useGameStore();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  // Define the visual tree layout - responsive positioning
+  // Auto-layout from CSV skills grouped by branch and depth (BFS by prerequisites)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-  const treeLayout: TreeNode[] = isMobile ? [
-    // Mobile layout - optimized for full screen
-    { id: 'steelMultiplier', x: window.innerWidth / 2 - 24, y: 80, tier: 0 },
-    { id: 'unlockCopper', x: window.innerWidth / 2 - 80, y: 160, tier: 1 },
-    { id: 'luckyRolls', x: window.innerWidth / 2 + 32, y: 160, tier: 1 },
-    { id: 'copperMultiplier', x: window.innerWidth / 2 - 120, y: 240, tier: 2 },
-    { id: 'rollSpeed', x: window.innerWidth / 2 - 40, y: 240, tier: 2 },
-    { id: 'sixesBonus', x: window.innerWidth / 2 + 40, y: 240, tier: 2 },
-    { id: 'hoverRadius', x: window.innerWidth / 2 + 120, y: 240, tier: 2 },
-  ] : [
-    // Desktop layout - original
-    { id: 'steelMultiplier', x: 200, y: 100, tier: 0 },
-    { id: 'unlockCopper', x: 100, y: 200, tier: 1 },
-    { id: 'luckyRolls', x: 300, y: 200, tier: 1 },
-    { id: 'copperMultiplier', x: 50, y: 300, tier: 2 },
-    { id: 'rollSpeed', x: 150, y: 300, tier: 2 },
-    { id: 'sixesBonus', x: 250, y: 300, tier: 2 },
-    { id: 'hoverRadius', x: 350, y: 300, tier: 2 },
-  ];
+  const branchOrder = ['Main', 'Luck', 'Automation', 'Face Value'] as const;
+  const horizontalGap = isMobile ? 120 : 200;
+  const verticalGap = isMobile ? 80 : 100;
+  const startX = isMobile ? 100 : 120;
+  const startY = isMobile ? 80 : 80;
 
-  const isUpgradeAvailable = (upgradeId: string) => {
-    const upgrade = upgrades[upgradeId];
-    if (!upgrade) return false;
-    
-    // Check if prerequisites are met
-    for (const prereq of upgrade.prerequisites) {
-      if (!upgrades[prereq] || upgrades[prereq].level === 0) {
-        return false;
+  const treeLayout: TreeNode[] = useMemo(() => {
+    const byBranch: Record<string, typeof SKILL_DEFINITIONS> = {} as any;
+    branchOrder.forEach((b) => {
+      byBranch[b] = SKILL_DEFINITIONS.filter((s) => s.branch === b);
+    });
+
+    const positions: TreeNode[] = [];
+    branchOrder.forEach((branch, branchIdx) => {
+      const skills = byBranch[branch];
+      // Determine depth via prerequisites count chain (simple heuristic)
+      const depthMap: Record<string, number> = {};
+      const resolveDepth = (id: string): number => {
+        if (depthMap[id] != null) return depthMap[id];
+        const s = skills.find((x) => x.id === id) || SKILL_DEFINITIONS.find((x)=>x.id===id);
+        if (!s || s.prerequisites.length === 0) {
+          depthMap[id] = 0; return 0;
+        }
+        const depth = 1 + Math.max(...s.prerequisites.map((p) => resolveDepth(p)));
+        depthMap[id] = depth;
+        return depth;
+      };
+      skills.forEach((s) => resolveDepth(s.id));
+
+      const skillsByDepth: Record<number, string[]> = {};
+      skills.forEach((s) => {
+        const d = depthMap[s.id] || 0;
+        if (!skillsByDepth[d]) skillsByDepth[d] = [];
+        skillsByDepth[d].push(s.id);
+      });
+
+      const branchX = startX + branchIdx * horizontalGap;
+
+      if (branch === 'Main') {
+        // Wrap the long Main branch into serpentine columns
+        const columnGap = isMobile ? 160 : 200;
+        const rowsPerColumn = isMobile ? 6 : 8;
+        const ordered = [...skills].sort((a, b) => (depthMap[a.id] || 0) - (depthMap[b.id] || 0));
+        ordered.forEach((s, idx) => {
+          const col = Math.floor(idx / rowsPerColumn);
+          const row = idx % rowsPerColumn;
+          const goingDown = col % 2 === 0; // even columns go down, odd go up
+          const yRow = goingDown ? row : (rowsPerColumn - 1 - row);
+          const x = branchX - col * columnGap;
+          const y = startY + yRow * verticalGap;
+          positions.push({ id: s.id, x, y, tier: yRow });
+        });
+      } else {
+        // Default layout: by depth tiers, slight horizontal jitter for siblings
+        const maxDepth = Math.max(0, ...Object.keys(skillsByDepth).map((k) => parseInt(k)));
+        for (let d = 0; d <= maxDepth; d++) {
+          const ids = skillsByDepth[d] || [];
+          ids.forEach((id, i) => {
+            const x = branchX + (isMobile ? 0 : (i - (ids.length - 1) / 2) * 120);
+            const y = startY + d * verticalGap;
+            positions.push({ id, x, y, tier: d });
+          });
+        }
       }
-    }
-    
-    return upgrade.level < upgrade.maxLevel;
+    });
+    return positions;
+  }, [isMobile]);
+
+  // Visibility: show node only when all prerequisites are purchased (or no prerequisites)
+  const isNodeVisible = (skillId: string) => {
+    const def = SKILL_DEFINITIONS.find(s => s.id === skillId);
+    if (!def) return false;
+    return def.prerequisites.every(p => purchasedSkills[p]);
   };
 
-  const canAffordUpgrade = (upgradeId: string) => {
-    const upgrade = upgrades[upgradeId];
-    return upgrade && gold >= upgrade.cost;
+  const visibleNodes = useMemo(() => treeLayout.filter(n => isNodeVisible(n.id)), [treeLayout, purchasedSkills]);
+
+  // Compute bounding box for centering
+  const layoutMetrics = useMemo(() => {
+    if (visibleNodes.length === 0) return { minX: 0, minY: 0, width: 0, height: 0 };
+    const minX = Math.min(...visibleNodes.map(n => n.x));
+    const minY = Math.min(...visibleNodes.map(n => n.y));
+    const maxX = Math.max(...visibleNodes.map(n => n.x));
+    const maxY = Math.max(...visibleNodes.map(n => n.y));
+    return { minX, minY, width: maxX - minX, height: maxY - minY };
+  }, [visibleNodes]);
+
+  const isSkillAvailable = (skillId: string) => {
+    const skill = SKILL_DEFINITIONS.find(s => s.id === skillId);
+    if (!skill) return false;
+    if (purchasedSkills[skillId]) return false;
+    return skill.prerequisites.every(p => purchasedSkills[p]);
   };
 
-  const getUpgradeStatus = (upgradeId: string) => {
-    const upgrade = upgrades[upgradeId];
-    if (!upgrade) return 'locked';
-    
-    if (upgrade.level >= upgrade.maxLevel) return 'maxed';
-    if (!isUpgradeAvailable(upgradeId)) return 'locked';
-    if (!canAffordUpgrade(upgradeId)) return 'unaffordable';
+  const canAffordSkill = (skillId: string) => {
+    const skill = SKILL_DEFINITIONS.find(s => s.id === skillId);
+    return !!skill && gold >= skill.cost;
+  };
+
+  const getSkillStatus = (skillId: string) => {
+    if (purchasedSkills[skillId]) return 'maxed';
+    if (!isSkillAvailable(skillId)) return 'locked';
+    if (!canAffordSkill(skillId)) return 'unaffordable';
     return 'available';
   };
 
@@ -85,28 +143,22 @@ const SkillTreeModal: React.FC = () => {
     }
   };
 
-  const getNodeIcon = (upgradeId: string) => {
-    const upgrade = upgrades[upgradeId];
-    if (!upgrade) return '🔒';
-    
-    if (upgradeId.includes('Multiplier')) return '💰';
-    if (upgradeId.includes('unlock')) return '🔓';
-    if (upgradeId.includes('lucky') || upgradeId.includes('sixes')) return '🎲';
-    if (upgradeId.includes('speed') || upgradeId.includes('radius')) return '⚡';
+  const getNodeIcon = (skillId: string) => {
+    if (skillId.startsWith('MAIN')) return '🛠️';
+    if (skillId.startsWith('LUCK')) return '🎲';
+    if (skillId.startsWith('AUTO')) return '⚙️';
+    if (skillId.startsWith('FACE')) return '🧊';
     return '⭐';
   };
 
   const getConnections = () => {
     const connections: Array<{ from: TreeNode; to: TreeNode }> = [];
-    
     treeLayout.forEach(node => {
-      const upgrade = upgrades[node.id];
-      if (upgrade) {
-        upgrade.prerequisites.forEach(prereqId => {
+      const skill = SKILL_DEFINITIONS.find(s => s.id === node.id);
+      if (skill) {
+        skill.prerequisites.forEach(prereqId => {
           const prereqNode = treeLayout.find(n => n.id === prereqId);
-          if (prereqNode) {
-            connections.push({ from: prereqNode, to: node });
-          }
+          if (prereqNode) connections.push({ from: prereqNode, to: node });
         });
       }
     });
@@ -116,15 +168,12 @@ const SkillTreeModal: React.FC = () => {
 
   if (!skillTreeOpen) return null;
 
-  const connections = getConnections();
+  const connections = getConnections().filter(({ to }) => visibleNodes.find(n => n.id === to.id));
+  const padding = isMobile ? 40 : 80;
 
   return (
     <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ${isMobile ? 'p-0' : 'p-2 sm:p-4'}`}>
-      <div className={`bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 shadow-xl overflow-hidden relative ${
-        isMobile 
-          ? 'w-full h-full rounded-none' 
-          : 'rounded-lg max-w-6xl w-full max-h-[95vh]'
-      }`}>
+      <div className={`bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 shadow-xl overflow-hidden relative w-full h-full rounded-none`}>
         {/* Starry background */}
         <div className="absolute inset-0 opacity-30">
           {Array.from({ length: 50 }).map((_, i) => (
@@ -158,119 +207,116 @@ const SkillTreeModal: React.FC = () => {
             </button>
           </div>
 
-          <div className={`relative overflow-auto ${isMobile ? 'flex-1' : ''}`} style={{ 
-            height: isMobile ? 'calc(100vh - 120px)' : '400px', 
-            width: '100%' 
+          <div className={`relative overflow-auto flex-1`} style={{ 
+            height: 'calc(100vh - 120px)', 
+            width: '100%'
           }}>
-            {/* Connection lines */}
-            <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
-              {connections.map((connection, index) => {
-                const nodeCenter = isMobile ? 24 : 32;
-                const fromX = connection.from.x;
-                const fromY = connection.from.y + nodeCenter; // Center of node
-                const toX = connection.to.x;
-                const toY = connection.to.y + nodeCenter;
-                
-                return (
-                  <line
-                    key={index}
-                    x1={fromX}
-                    y1={fromY}
-                    x2={toX}
-                    y2={toY}
-                    stroke="white"
-                    strokeWidth="2"
-                    opacity="0.6"
-                  />
-                );
-              })}
-            </svg>
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="relative" style={{ width: layoutMetrics.width + padding * 2, height: layoutMetrics.height + padding * 2 }}>
+                {/* Connection lines inside centered graph */}
+                <svg className="absolute inset-0" width={layoutMetrics.width + padding * 2} height={layoutMetrics.height + padding * 2} style={{ zIndex: 1 }}>
+                  {connections.map((connection, index) => {
+                    const nodeCenter = isMobile ? 24 : 32;
+                    const fromX = (connection.from.x - layoutMetrics.minX) + padding;
+                    const fromY = (connection.from.y - layoutMetrics.minY) + padding + nodeCenter;
+                    const toX = (connection.to.x - layoutMetrics.minX) + padding;
+                    const toY = (connection.to.y - layoutMetrics.minY) + padding + nodeCenter;
+                    return (
+                      <line
+                        key={index}
+                        x1={fromX}
+                        y1={fromY}
+                        x2={toX}
+                        y2={toY}
+                        stroke="white"
+                        strokeWidth="2"
+                        opacity="0.6"
+                      />
+                    );
+                  })}
+                </svg>
 
-            {/* Skill nodes */}
-            {treeLayout.map((node) => {
-              const upgrade = upgrades[node.id];
-              if (!upgrade) return null;
-              
-              const status = getUpgradeStatus(node.id);
-              const isMaxed = upgrade.level >= upgrade.maxLevel;
-              
-              return (
-                <div
-                  key={node.id}
-                  className="absolute"
-                  style={{
-                    left: node.x - (isMobile ? 24 : 32),
-                    top: node.y - (isMobile ? 24 : 32),
-                    zIndex: 2,
-                  }}
-                >
-                  <div
-                    className={getNodeStyle(status)}
-                    onClick={() => {
-                      if (status === 'available' || status === 'unaffordable') {
-                        purchaseUpgrade(node.id);
-                      }
-                    }}
-                    onMouseEnter={() => setHoveredNode(node.id)}
-                    onMouseLeave={() => setHoveredNode(null)}
-                  >
-                    <div className="text-center">
-                      <div className="text-lg">{getNodeIcon(node.id)}</div>
-                      {status === 'locked' && <div className="text-xs">🔒</div>}
+                {/* Skill nodes (only visible) inside centered graph */}
+                {visibleNodes.map((node) => {
+                  const def = SKILL_DEFINITIONS.find(s => s.id === node.id);
+                  if (!def) return null;
+                  const status = getSkillStatus(node.id);
+                  return (
+                    <div
+                      key={node.id}
+                      className="absolute"
+                      style={{
+                        left: (node.x - layoutMetrics.minX) + padding - (isMobile ? 24 : 32),
+                        top: (node.y - layoutMetrics.minY) + padding - (isMobile ? 24 : 32),
+                        zIndex: 2,
+                      }}
+                    >
+                      <div
+                        className={getNodeStyle(status)}
+                        onClick={() => {
+                          if (status === 'available' || status === 'unaffordable') purchaseSkill(node.id);
+                        }}
+                        onMouseEnter={() => setHoveredNode(node.id)}
+                        onMouseLeave={() => setHoveredNode(null)}
+                      >
+                        <div className="text-center">
+                          <div className="text-lg">{getNodeIcon(node.id)}</div>
+                          {status === 'locked' && <div className="text-xs">🔒</div>}
+                        </div>
+                      </div>
+                      
+                      {/* Node label */}
+                      <div className="text-white text-xs text-center mt-1 max-w-20">
+                        {def.name.split(' ')[0]}
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Node label */}
-                  <div className="text-white text-xs text-center mt-1 max-w-20">
-                    {upgrade.name.split(' ')[0]}
-                  </div>
-                  
-                  {/* Level indicator */}
-                  {upgrade.level > 0 && (
-                    <div className="text-yellow-400 text-xs text-center mt-1">
-                      {upgrade.level}/{upgrade.maxLevel}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
 
-            {/* Tooltip */}
-            {hoveredNode && upgrades[hoveredNode] && (
-              <div
-                className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm max-w-48 sm:max-w-64 z-50 ${
-                  isMobile ? 'text-center' : ''
-                }`}
-                style={{
-                  left: treeLayout.find(n => n.id === hoveredNode)?.x ? 
-                    Math.min(treeLayout.find(n => n.id === hoveredNode)!.x + (isMobile ? 30 : 50), isMobile ? 200 : 400) : 0,
-                  top: treeLayout.find(n => n.id === hoveredNode)?.y ? 
-                    treeLayout.find(n => n.id === hoveredNode)!.y - (isMobile ? 40 : 50) : 0,
-                }}
-              >
-                <div className="font-bold text-yellow-400 mb-1">
-                  {upgrades[hoveredNode].name}
-                </div>
-                <div className="text-gray-300 mb-2">
-                  {upgrades[hoveredNode].description}
-                </div>
-                <div className="text-sm">
-                  <div className="text-yellow-400">
-                    Level: {upgrades[hoveredNode].level}/{upgrades[hoveredNode].maxLevel}
-                  </div>
-                  <div className="text-green-400">
-                    Cost: {upgrades[hoveredNode].cost.toLocaleString()} Gold
-                  </div>
-                  {upgrades[hoveredNode].prerequisites.length > 0 && (
-                    <div className="text-gray-400 text-xs mt-1">
-                      Requires: {upgrades[hoveredNode].prerequisites.map(prereq => 
-                        upgrades[prereq]?.name || prereq
-                      ).join(', ')}
+                {/* Tooltip inside centered graph, clamped to container bounds */}
+                {hoveredNode && SKILL_DEFINITIONS.find(s=>s.id===hoveredNode) && (() => {
+                  const n = visibleNodes.find(n => n.id === hoveredNode) || treeLayout.find(n => n.id === hoveredNode);
+                  if (!n) return null;
+                  const containerW = layoutMetrics.width + padding * 2;
+                  const containerH = layoutMetrics.height + padding * 2;
+                  const nodeX = (n.x - layoutMetrics.minX) + padding;
+                  const nodeY = (n.y - layoutMetrics.minY) + padding;
+                  const estTooltipW = isMobile ? 200 : 320;
+                  const estTooltipH = isMobile ? 100 : 140;
+                  const desiredLeft = nodeX + (isMobile ? 30 : 50);
+                  const desiredTop = nodeY - (isMobile ? 50 : 60);
+                  const left = Math.max(8, Math.min(desiredLeft, containerW - estTooltipW - 8));
+                  const top = Math.max(8, Math.min(desiredTop, containerH - estTooltipH - 8));
+                  return (
+                    <div
+                      className={`absolute bg-gray-800 border border-gray-600 rounded-lg p-2 sm:p-3 text-white text-xs sm:text-sm z-50 ${
+                        isMobile ? 'text-center' : ''
+                      }`}
+                      style={{ left, top, maxWidth: isMobile ? 200 : 320 }}
+                    >
+                      <div className="font-bold text-yellow-400 mb-1">
+                        {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.name}
+                      </div>
+                      <div className="text-gray-300 mb-2">
+                        {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.description}
+                      </div>
+                      <div className="text-sm">
+                        <div className="text-green-400">
+                          Cost: {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.cost.toLocaleString()} Gold
+                        </div>
+                        {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.prerequisites.length > 0 && (
+                          <div className="text-gray-400 text-xs mt-1">
+                            Requires: {SKILL_DEFINITIONS.find(s=>s.id===hoveredNode)!.prerequisites.map(prereq => 
+                              SKILL_DEFINITIONS.find(s=>s.id===prereq)?.name || prereq
+                            ).join(', ')}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

@@ -1,0 +1,10 @@
+Tier Name,Base Cost,Earnings Multiplier,Unlock Condition
+Steel,10 Gold,1x,Available at start
+Copper,50 Gold,1.5x,Unlock in Skill Tree
+Silver,100 Gold,3x,Unlock in Skill Tree
+Gold,250 Gold,5x,Unlock in Skill Tree
+Emerald,1000 Gold,10x,Unlock in Skill Tree
+Platinum,5000 Gold,20x,Unlock in Skill Tree
+Diamond,25000 Gold,50x,Unlock in Skill Tree
+Ruby,100000 Gold,100x,Unlock in Skill Tree
+Obsidian,500000 Gold,200x,Unlock in Skill Tree

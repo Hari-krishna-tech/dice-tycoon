@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export interface Die {
   id: string;
-  tier: 'steel' | 'copper' | 'silver' | 'gold' | 'emerald';
+  tier: 'steel' | 'copper' | 'silver' | 'gold' | 'emerald' | 'platinum' | 'diamond' | 'ruby' | 'obsidian';
   x: number;
   y: number;
   // Persist last-known positions for each layout so we can restore across breakpoints
@@ -42,6 +42,8 @@ export interface GameState {
   dice: Die[];
   diceTiers: Record<string, DiceTier>;
   upgrades: Record<string, Upgrade>;
+  // CSV-driven skills
+  purchasedSkills: Record<string, boolean>;
   
   // UI state
   skillTreeOpen: boolean;
@@ -53,50 +55,30 @@ export interface GameState {
   rollDie: (dieId: string) => void;
   updateDiePosition: (dieId: string, x: number, y: number) => void;
   purchaseUpgrade: (upgradeId: string) => void;
+  purchaseSkill: (skillId: string) => void;
   toggleSkillTree: () => void;
   resetGame: () => void;
 }
 
-// Dice tier configurations
-const DICE_TIERS: Record<string, DiceTier> = {
-  steel: {
-    name: 'Steel',
-    baseCost: 10,
-    multiplier: 1,
-    unlocked: true,
-    count: 0,
-  },
-  copper: {
-    name: 'Copper',
-    baseCost: 100,
-    multiplier: 5,
-    unlocked: false,
-    count: 0,
-  },
-  silver: {
-    name: 'Silver',
-    baseCost: 1000,
-    multiplier: 25,
-    unlocked: false,
-    count: 0,
-  },
-  gold: {
-    name: 'Gold',
-    baseCost: 25000,
-    multiplier: 150,
-    unlocked: false,
-    count: 0,
-  },
-  emerald: {
-    name: 'Emerald',
-    baseCost: 500000,
-    multiplier: 1000,
-    unlocked: false,
-    count: 0,
-  },
+// Data-driven dice tier configuration
+import { TIER_DEFINITIONS, TierKey } from './data/tiers';
+
+const buildInitialDiceTiers = (): Record<string, DiceTier> => {
+  const tiers: Record<string, DiceTier> = {};
+  (Object.keys(TIER_DEFINITIONS) as TierKey[]).forEach((key) => {
+    const def = TIER_DEFINITIONS[key];
+    tiers[key] = {
+      name: def.name,
+      baseCost: def.baseCost,
+      multiplier: def.multiplier,
+      unlocked: def.unlockedBy === 'start',
+      count: 0,
+    };
+  });
+  return tiers;
 };
 
-// Skill tree configuration
+// Keep legacy upgrades for gameplay multipliers (independent of CSV skills)
 const SKILL_TREE: Record<string, Upgrade> = {
   steelMultiplier: {
     id: 'steelMultiplier',
@@ -177,14 +159,18 @@ const SKILL_TREE: Record<string, Upgrade> = {
   },
 };
 
+// CSV-driven skills data
+import { SKILL_DEFINITIONS } from './data/skills';
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
       // Initial state
       gold: 100,
       dice: [],
-      diceTiers: { ...DICE_TIERS },
+      diceTiers: buildInitialDiceTiers(),
       upgrades: { ...SKILL_TREE },
+      purchasedSkills: {},
       skillTreeOpen: false,
 
       // Actions
@@ -375,6 +361,35 @@ export const useGameStore = create<GameState>()(
         }
       },
 
+      purchaseSkill: (skillId: string) => {
+        const state = get();
+        const def = SKILL_DEFINITIONS.find(s => s.id === skillId);
+        if (!def) return;
+        if (state.purchasedSkills[skillId]) return;
+        // prerequisites
+        const prereqsMet = def.prerequisites.every(p => state.purchasedSkills[p]);
+        if (!prereqsMet) return;
+        if (!state.spendGold(def.cost)) return;
+
+        set((state) => ({
+          purchasedSkills: { ...state.purchasedSkills, [skillId]: true },
+        }));
+
+        // Unlock tiers whose unlockedBy matches this skill id
+        const tiersToUnlock = (Object.keys(TIER_DEFINITIONS) as TierKey[]).filter(
+          (k) => TIER_DEFINITIONS[k].unlockedBy === skillId
+        );
+        if (tiersToUnlock.length > 0) {
+          set((state) => {
+            const updated: Record<string, DiceTier> = { ...state.diceTiers };
+            tiersToUnlock.forEach((k) => {
+              updated[k] = { ...updated[k], unlocked: true };
+            });
+            return { diceTiers: updated } as Partial<GameState> as any;
+          });
+        }
+      },
+
       toggleSkillTree: () => {
         set((state) => ({ skillTreeOpen: !state.skillTreeOpen }));
       },
@@ -383,8 +398,9 @@ export const useGameStore = create<GameState>()(
         set({
           gold: 100,
           dice: [],
-          diceTiers: { ...DICE_TIERS },
+          diceTiers: buildInitialDiceTiers(),
           upgrades: { ...SKILL_TREE },
+          purchasedSkills: {},
           skillTreeOpen: false,
         });
       },
@@ -396,6 +412,7 @@ export const useGameStore = create<GameState>()(
         dice: state.dice,
         diceTiers: state.diceTiers,
         upgrades: state.upgrades,
+        purchasedSkills: state.purchasedSkills,
       }),
     }
   )

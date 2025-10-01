@@ -1,0 +1,38 @@
+Skill ID,Skill Name,Branch,Description,Effect,Cost (SP),Prerequisite(s)
+MAIN-01,Steel Honing I,Main,Sharpen the edges of your Steel die for slightly better returns.,Increases Steel Die multiplier by +0.1x.,15 SP,None
+MAIN-02,Steel Honing II,Main,Further refinements to the Steel die.,Increases Steel Die multiplier by another +0.15x.,40 SP,MAIN-01
+MAIN-03,Unlock: Copper Die,Main,Unlocks the ability to purchase the Copper Die from the shop.,Copper Die becomes available.,100 SP,MAIN-02
+MAIN-04,Copper Honing I,Main,Further refinements to the Copper Die.,Increase the Multiplier by +0.5x,200 SP,MAIN-03
+MAIN-05,Copper Honing II,Main,Advanced techniques for the Copper Die.,Increases Copper Die multiplier by another +0.75x.,350 SP,MAIN-04
+MAIN-06,Overall Income I,Main,Foundational knowledge of earnings. Increases all Gold gained.,+5% overall income multiplier.,500 SP,MAIN-05
+MAIN-07,Unlock: Silver Die,Main,Unlocks the ability to purchase the Silver Die from the shop.,Silver Die becomes available.,800 SP,MAIN-06
+MAIN-08,Silver Honing I,Main,Polish the Silver Die to a brilliant shine.,Increases Silver Die multiplier by +1x.,"1,200 SP",MAIN-07
+MAIN-09,Silver Honing II,Main,Engrave the Silver Die with patterns of power.,Increases Silver Die multiplier by another +1.5x.,"2,000 SP",MAIN-08
+MAIN-10,Unlock: Gold Die,Main,Unlocks the ability to purchase the Gold Die from the shop.,Gold Die becomes available.,"3,500 SP",MAIN-09
+MAIN-11,Gold Honing I,Main,"Refine the Gold Die, making it heavier and mightier.",Increases Gold Die multiplier by +2x.,"5,000 SP",MAIN-10
+MAIN-12,Overall Income II,Main,Advanced economic theories. Increases all Gold gained.,+10% overall income multiplier.,"8,000 SP",MAIN-11
+MAIN-13,Gold Honing II,Main,Imbue the Gold Die with an aura of wealth.,Increases Gold Die multiplier by another +3x.,"12,000 SP",MAIN-12
+MAIN-14,Unlock: Emerald Die,Main,Unlocks the ability to purchase the Emerald Die from the shop.,Emerald Die becomes available.,"20,000 SP",MAIN-13
+MAIN-15,Emerald Honing I,Main,Cut facets into the Emerald Die to catch the light of fortune.,Increases Emerald Die multiplier by +5x.,"30,000 SP",MAIN-14
+MAIN-16,Emerald Honing II,Main,The Emerald Die now hums with latent energy.,Increases Emerald Die multiplier by another +5x.,"50,000 SP",MAIN-15
+MAIN-17,Unlock: Platinum Die,Main,Unlocks the ability to purchase the Platinum Die from the shop.,Platinum Die becomes available.,"80,000 SP",MAIN-16
+MAIN-18,Platinum Honing I,Main,The sheer density of the Platinum Die improves its impact.,Increases Platinum Die multiplier by +10x.,"120,000 SP",MAIN-17
+MAIN-19,Unlock: Diamond Die,Main,Unlocks the ability to purchase the Diamond Die from the shop.,Diamond Die becomes available.,"200,000 SP",MAIN-18
+MAIN-20,Diamond Honing I,Main,"A flawless Diamond Die, perfectly balanced for maximum returns.",Increases Diamond Die multiplier by +25x.,"350,000 SP",MAIN-19
+MAIN-21,Overall Income III,Main,Mastery of the market. Increases all Gold gained significantly.,+15% overall income multiplier.,"500,000 SP",MAIN-20
+MAIN-22,Unlock: Ruby Die,Main,Unlocks the ability to purchase the Ruby Die from the shop.,Ruby Die becomes available.,"800,000 SP",MAIN-21
+MAIN-23,Ruby Honing I,Main,"The inner fire of the Ruby Die burns brighter, yielding more gold.",Increases Ruby Die multiplier by +50x.,"1,200,000 SP",MAIN-22
+MAIN-24,Unlock: Obsidian Die,Main,Unlocks the ability to purchase the Obsidian Die from the shop.,Obsidian Die becomes available.,"2,000,000 SP",MAIN-23
+MAIN-25,Obsidian Honing I,Main,The volcanic glass of the Obsidian Die is razor-sharp.,Increases Obsidian Die multiplier by +100x.,"5,000,000 SP",MAIN-24
+LUCK-01,Beginner's Luck,Luck,You start to feel a bit luckier. The die seems to favor higher numbers.,"+5% chance to roll a 4, 5, or 6. ",50 SP,MAIN-01
+LUCK-02,Lucky Roll,Luck,"Your control over the die improves, making high rolls more common.","An additional +10% chance to roll a 4, 5, or 6. ",150 SP,LUCK-01
+LUCK-03,Critical Hit,Luck,"A small chance that your roll is supercharged, yielding double the result.",1% chance to double the final Gold from a roll.,400 SP,LUCK-02
+LUCK-04,Sixes Sense,Luck,You have a knack for rolling the highest number.,Rolling a 6 has a 10% chance to be treated as a 7 for Gold calculation.,750 SP,LUCK-03
+AUTO-01,Hover to Roll,Automation,Your mere presence is enough to move the die. Roll by hovering.,Enables rolling by hovering the mouse over the die.,75 SP,MAIN-01
+AUTO-02,Wider Influence,Automation,"Your hover-to-roll aura expands, making it easier to activate.",Increases the hover activation area by 30%.,120 SP,AUTO-01
+AUTO-03,Auto-Roller Mk I,Automation,"The die develops a mind of its own, rolling automatically.",Automatically rolls the die once every 10 seconds.,300 SP,AUTO-02
+AUTO-04,Auto-Roller Mk II,Automation,The auto-roller becomes faster and more efficient.,Reduces auto-roll time to once every 5 seconds.,800 SP,AUTO-03
+FACE-01,Weighted Ones,Face Value,Even a roll of 1 provides a small bonus.,Rolls of 1 grant +2 flat Gold before multipliers.,60 SP,MAIN-02
+FACE-02,Double Down,Face Value,Rolling a 2 now feels more rewarding.,Rolls of 2 have their base value doubled to 4.,120 SP,FACE-01
+FACE-03,Low Roller's Boon,Face Value,Master the art of low rolls. All low numbers are more valuable.,"Increases base Gold from rolls of 1, 2, and 3 by 50%. ",350 SP,FACE-02
+FACE-04,High Roller's Reward,Face Value,Live for the big numbers. High rolls now pay a premium.,"Rolls of 4, 5, and 6 grant a +25% Gold bonus. ",600 SP,MAIN-06

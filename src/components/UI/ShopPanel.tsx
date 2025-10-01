@@ -9,6 +9,10 @@ const TIER_COLORS = {
   silver: 'bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600',
   gold: 'bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800',
   emerald: 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800',
+  platinum: 'bg-gradient-to-r from-slate-200 to-slate-300 hover:from-slate-300 hover:to-slate-400 text-gray-800',
+  diamond: 'bg-gradient-to-r from-cyan-200 to-cyan-300 hover:from-cyan-300 hover:to-cyan-400 text-gray-900',
+  ruby: 'bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800',
+  obsidian: 'bg-gradient-to-r from-neutral-800 to-neutral-900 hover:from-neutral-900 hover:to-black',
 };
 
 const ShopPanel: React.FC = () => {
@@ -64,7 +68,7 @@ const ShopPanel: React.FC = () => {
               disabled={!canAfford(tierKey)}
               className={`w-full py-1 px-2 rounded-lg font-semibold transition-all duration-200 shadow-lg text-xs min-h-[32px] flex items-center justify-center ${
                 canAfford(tierKey)
-                  ? TIER_COLORS[tierKey as keyof typeof TIER_COLORS] + ' text-white hover:shadow-lg'
+                  ? `${TIER_COLORS[tierKey as keyof typeof TIER_COLORS]} ${['platinum','diamond'].includes(tierKey) ? '' : 'text-white'} hover:shadow-lg`
                   : 'bg-gray-600 text-gray-400 cursor-not-allowed'
               }`}
             >

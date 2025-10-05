@@ -1,18 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Stage, Layer } from 'react-konva';
 import { useGameStore } from '../store/gameStore';
 import Dice from './Dice';
 import { TIER_DEFINITIONS } from '@/store/data/tiers';
-
-interface RippleEffect {
-  id: string;
-  x: number;
-  y: number;
-  startTime: number;
-  duration: number;
-}
 
 interface GoldPopup {
   id: string;
@@ -23,11 +15,11 @@ interface GoldPopup {
 }
 
 const GameCanvas: React.FC = () => {
-  const { dice, rollDie, updateDiePosition } = useGameStore();
+  const { dice, rollDie, updateDiePosition, purchasedSkills } = useGameStore();
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
-  const [ripples, setRipples] = useState<RippleEffect[]>([]);
   const [goldPopups, setGoldPopups] = useState<GoldPopup[]>([]);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const autoIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -85,38 +77,54 @@ const GameCanvas: React.FC = () => {
     });
   }, [dimensions.width, dimensions.height, dice.length, isMobile]);
 
+  // Auto-rolling automation based on skills
+  useEffect(() => {
+    const hasAutoMk1 = !!purchasedSkills['AUTO-03'];
+    const hasAutoMk2 = !!purchasedSkills['AUTO-04'];
+    const intervalMs = hasAutoMk2 ? 5000 : hasAutoMk1 ? 10000 : 0;
+    if (!intervalMs) {
+      if (autoIntervalRef.current) {
+        clearInterval(autoIntervalRef.current);
+        autoIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Clear any existing interval before setting a new one
+    if (autoIntervalRef.current) {
+      clearInterval(autoIntervalRef.current);
+    }
+
+    autoIntervalRef.current = window.setInterval(() => {
+      const { dice: latestDice, rollDie: storeRollDie } = useGameStore.getState();
+      const now = Date.now();
+      const eligible = latestDice.filter((d) => !d.isRolling && now - d.lastRollTime >= 300);
+      if (eligible.length === 0) return;
+      const chosen = eligible[Math.floor(Math.random() * eligible.length)];
+      const forcedFace = Math.floor(Math.random() * 6) + 1;
+      storeRollDie(chosen.id, forcedFace);
+    }, intervalMs);
+
+    return () => {
+      if (autoIntervalRef.current) {
+        clearInterval(autoIntervalRef.current);
+        autoIntervalRef.current = null;
+      }
+    };
+  }, [purchasedSkills['AUTO-03'], purchasedSkills['AUTO-04']]);
+
   // Handle dice roll with background effects
   const handleDiceRoll = (dieId: string): number => {
     let rolledNumber = 0;
     const die = dice.find(d => d.id === dieId);
     if (die) {
-      // Create ripple effect
-      const rippleId = `ripple-${Date.now()}-${Math.random()}`;
-      const newRipple: RippleEffect = {
-        id: rippleId,
-        x: die.x,
-        y: die.y,
-        startTime: Date.now(),
-        duration: 1000
-      };
-      setRipples(prev => [...prev, newRipple]);
-
-      // Calculate gold earned (same logic as in store)
+      // Ask store to roll and compute earned gold consistently with skills
       rolledNumber = Math.floor(Math.random() * 6) + 1;
-      const tierMultiplier = TIER_DEFINITIONS[die.tier].multiplier;
-      console.log(tierMultiplier);
-      // Apply upgrades (simplified version)
-      let globalMultiplier = 1;
-      // Note: In a real implementation, you'd get these from the store
-      // For now, we'll use a simplified calculation
-      
-      const goldEarned = Math.floor(rolledNumber * tierMultiplier * globalMultiplier);
-      console.log("rolledNumber", rolledNumber);
-      console.log("goldEarned", goldEarned);
-      // Remove ripple after animation
-      setTimeout(() => {
-        setRipples(prev => prev.filter(r => r.id !== rippleId));
-      }, 1000);
+      const goldEarned = rollDie(dieId, rolledNumber);
+      if (goldEarned <= 0) {
+        return rolledNumber;
+      }
+      // No ripple cleanup needed since ripples removed
 
       // Show gold popup when die lands (after rolling animation)
       setTimeout(() => {
@@ -136,71 +144,15 @@ const GameCanvas: React.FC = () => {
         }, 500); // Shorter duration
       }, 600); // Wait for die to land
 
-      // Trigger the actual dice roll with the chosen number so UI matches
-      rollDie(dieId, rolledNumber);
+      // Store roll already triggered above
     }
     return rolledNumber;
   };
 
   return (
     <div className="w-full h-full bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 rounded-lg shadow-lg relative overflow-hidden">
-      {/* Starry background */}
-      <div className="absolute inset-0 opacity-40">
-        {Array.from({ length: 100 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full animate-pulse"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Animated shooting stars */}
-      <div className="absolute inset-0 overflow-hidden">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-80"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animation: `shooting-star ${3 + Math.random() * 2}s linear infinite`,
-              animationDelay: `${Math.random() * 5}s`,
-            }}
-          />
-        ))}
-      </div>
 
-      {/* Ripple effects from dice clicks */}
-      {ripples.map((ripple) => {
-        const elapsed = Date.now() - ripple.startTime;
-        const progress = Math.min(elapsed / ripple.duration, 1);
-        const scale = progress * 4; // Increased scale for more visibility
-        const opacity = 1 - progress;
-        
-        return (
-          <div
-            key={ripple.id}
-            className="absolute pointer-events-none"
-            style={{
-              left: ripple.x - 75,
-              top: ripple.y - 75,
-              width: 150,
-              height: 150,
-              transform: `scale(${scale})`,
-              opacity: opacity,
-            }}
-          >
-            <div className="w-full h-full border-4 border-yellow-400 rounded-full animate-ping shadow-lg shadow-yellow-400/50" />
-            <div className="absolute inset-0 w-full h-full border-2 border-yellow-300 rounded-full animate-ping" style={{ animationDelay: '0.1s' }} />
-          </div>
-        );
-      })}
+      {/* Ripple effects removed */}
 
       {/* Gold popups */}
       {goldPopups.map((popup) => {
@@ -256,39 +208,7 @@ const GameCanvas: React.FC = () => {
         </Layer>
       </Stage>
 
-      <style jsx>{`
-        @keyframes shooting-star {
-          0% {
-            transform: translateX(-100px) translateY(100px);
-            opacity: 0;
-          }
-          10% {
-            opacity: 1;
-          }
-          90% {
-            opacity: 1;
-          }
-          100% {
-            transform: translateX(100px) translateY(-100px);
-            opacity: 0;
-          }
-        }
-        
-        @keyframes cosmic-burst {
-          0% {
-            transform: scale(0) rotate(0deg);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.5) rotate(180deg);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(3) rotate(360deg);
-            opacity: 0;
-          }
-        }
-      `}</style>
+      {/* Removed flashing CSS animations */}
     </div>
   );
 };

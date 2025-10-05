@@ -52,7 +52,7 @@ export interface GameState {
   addGold: (amount: number) => void;
   spendGold: (amount: number) => boolean;
   spawnDie: (tier: string) => void;
-  rollDie: (dieId: string, rolledNumber?: number) => void;
+  rollDie: (dieId: string, rolledNumber?: number) => number;
   updateDiePosition: (dieId: string, x: number, y: number) => void;
   purchaseUpgrade: (upgradeId: string) => void;
   purchaseSkill: (skillId: string) => void;
@@ -267,20 +267,41 @@ export const useGameStore = create<GameState>()(
       rollDie: (dieId: string, rolledNumber?: number) => {
         const state = get();
         const die = state.dice.find(d => d.id === dieId);
-        if (!die) return;
+        if (!die) return 0;
 
         const now = Date.now();
         const cooldown = 300; // 300ms cooldown
 
-        if (now - die.lastRollTime < cooldown) return;
+        if (now - die.lastRollTime < cooldown) return 0;
 
-        // Use provided rolled number if given; otherwise generate
-        const finalRolledNumber = (typeof rolledNumber === 'number' && rolledNumber >= 1 && rolledNumber <= 6)
-          ? rolledNumber
-          : Math.floor(Math.random() * 6) + 1;
-        const tierMultiplier = state.diceTiers[die.tier].multiplier;
-        
-        // Apply upgrades
+        // Use provided rolled number if given; otherwise generate with Luck bias
+        let finalRolledNumber: number;
+        if (typeof rolledNumber === 'number' && rolledNumber >= 1 && rolledNumber <= 6) {
+          finalRolledNumber = rolledNumber;
+        } else {
+          const biasToHigh = (state.purchasedSkills['LUCK-01'] ? 0.05 : 0) + (state.purchasedSkills['LUCK-02'] ? 0.10 : 0);
+          if (Math.random() < biasToHigh) {
+            // Bias to higher results 4,5,6
+            const high = [4, 5, 6];
+            finalRolledNumber = high[Math.floor(Math.random() * high.length)];
+          } else {
+            // Correct uniform 1..6
+            finalRolledNumber = Math.floor(Math.random() * 6) + 1;
+          }
+        }
+        // Base tier multiplier
+        let tierMultiplier = state.diceTiers[die.tier].multiplier;
+
+        // Additive honing from purchased Main skills
+        // Sum multipliers for this die's tier
+        const honingBonus = SKILL_DEFINITIONS
+          .filter((def) => state.purchasedSkills[def.id])
+          .filter((def) => def.effectType === 'tierMultiplier' && def.targetTier === die.tier)
+          .reduce((sum, def) => sum + (def.multiplier || 0), 0);
+
+        tierMultiplier += honingBonus;
+
+        // Legacy upgrades
         let globalMultiplier = 1;
         if (state.upgrades.steelMultiplier && die.tier === 'steel') {
           globalMultiplier += state.upgrades.steelMultiplier.level * state.upgrades.steelMultiplier.effect;
@@ -292,7 +313,45 @@ export const useGameStore = create<GameState>()(
           globalMultiplier *= state.upgrades.sixesBonus.effect;
         }
 
-        const goldEarned = Math.floor(finalRolledNumber * tierMultiplier * globalMultiplier);
+        // Overall income multiplier from Main skills (multiplicative on final gold)
+        const overallIncomeAdditive = SKILL_DEFINITIONS
+          .filter((def) => state.purchasedSkills[def.id])
+          .filter((def) => def.effectType === 'globalIncome')
+          .reduce((sum, def) => sum + (def.multiplier || 0), 0);
+
+        const overallIncomeMultiplier = 1 + overallIncomeAdditive;
+
+        // Sixes Sense: treat 6 as 7 sometimes for value calculation (not face)
+        let baseRollValue = finalRolledNumber;
+        if (finalRolledNumber === 6 && state.purchasedSkills['LUCK-04'] && Math.random() < 0.10) {
+          baseRollValue = 7;
+        }
+
+        // Face Value branch adjustments on base value (before multipliers)
+        if (state.purchasedSkills['FACE-02'] && finalRolledNumber === 2) {
+          // Double 2 to 4
+          baseRollValue = 4;
+        }
+        if (state.purchasedSkills['FACE-01'] && finalRolledNumber === 1) {
+          // +2 flat to 1 before multipliers
+          baseRollValue += 2;
+        }
+        if (state.purchasedSkills['FACE-03'] && (finalRolledNumber === 1 || finalRolledNumber === 2 || finalRolledNumber === 3)) {
+          // +50% to low rolls base value
+          baseRollValue = Math.max(0, baseRollValue * 1.5);
+        }
+
+        let goldEarned = Math.floor(baseRollValue * tierMultiplier * globalMultiplier * overallIncomeMultiplier);
+
+        // High rolls bonus: +25% for 4/5/6
+        if (state.purchasedSkills['FACE-04'] && (finalRolledNumber === 4 || finalRolledNumber === 5 || finalRolledNumber === 6)) {
+          goldEarned = Math.floor(goldEarned * 1.25);
+        }
+
+        // Critical Hit: 1% chance to double final gold
+        if (state.purchasedSkills['LUCK-03'] && Math.random() < 0.01) {
+          goldEarned *= 2;
+        }
 
         set((state) => ({
           dice: state.dice.map(d => 
@@ -311,6 +370,8 @@ export const useGameStore = create<GameState>()(
             ),
           }));
         }, 600);
+        
+        return goldEarned;
       },
 
       updateDiePosition: (dieId: string, x: number, y: number) => {

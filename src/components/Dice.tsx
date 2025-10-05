@@ -17,7 +17,7 @@ interface DiceProps {
 }
 
 const DICE_COLORS = {
-  steel: '#C0C0C0',
+  steel: '#7A7A7A',
   copper: '#B87333',
   silver: '#E5E5E5',
   gold: '#FFD700',
@@ -58,11 +58,16 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [rollDirection, setRollDirection] = useState<{x: number, y: number}>({x: 1, y: 1});
   const [isActuallyRolling, setIsActuallyRolling] = useState(false);
-  const { updateDiePosition } = useGameStore();
+  const { updateDiePosition, purchasedSkills } = useGameStore();
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
   const size = isMobile ? MOBILE_DICE_SIZES[die.tier] : DICE_SIZES[die.tier];
   const color = DICE_COLORS[die.tier];
+  const hoverEnabled = !!purchasedSkills['AUTO-01'];
+  const hoverRadiusMultiplier = purchasedSkills['AUTO-02'] ? 1.3 : 1.0;
+  const hoverSize = size * hoverRadiusMultiplier;
+  const lastHoverRollTimeRef = useRef<number>(0);
+  const hoverDebounceMs = 50; // Low debounce for near-immediate hover response
 
   // Realistic rolling animation with multiple face changes
   useEffect(() => {
@@ -77,8 +82,8 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
       
       // Animate through random faces with decreasing speed (like the reference)
       let currentIndex = 0;
-      let delay = 30; // Start very fast like the reference
-      const totalFrames = 20; // More frames for smoother animation
+      let delay = 35; // Start fast
+      const totalFrames = 12; // Fewer frames to reduce work per roll
       
       const animateSequence = () => {
         if (currentIndex < totalFrames) {
@@ -86,7 +91,7 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
           const faces = [1, 2, 3, 4, 5, 6];
           setCurrentRollingFace(faces[Math.floor(Math.random() * faces.length)]);
           currentIndex++;
-          delay = Math.min(delay + 5, 100); // Gradually slow down
+          delay = Math.min(delay + 8, 110); // Gradually slow down with fewer steps
           setTimeout(animateSequence, delay);
         } else {
           setIsAnimating(false);
@@ -102,7 +107,7 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
     if (die.isRolling && groupRef.current) {
       setIsActuallyRolling(true); // Set rolling state when animation starts
       let startTime = Date.now();
-      const duration = 600; // 600ms total animation
+      const duration = 400; // Shorter animation for smoother feel
       const originalX = die.x;
       const originalY = die.y;
       
@@ -202,10 +207,8 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
           groupRef.current.scaleX(scaleBounce);
           groupRef.current.scaleY(scaleBounce);
           
-          // Force redraw
-          groupRef.current.getLayer()?.batchDraw();
-          
-          
+          // Rely on Konva's internal redraw; avoid forcing batchDraw every frame
+
           requestAnimationFrame(animate);
         } else if (groupRef.current) {
           // Land at the final position
@@ -331,6 +334,45 @@ const Dice: React.FC<DiceProps> = ({ die, onRoll }) => {
       
       {/* Dice face dots */}
       {renderDots(currentDisplayFace)}
+
+      {/* Hover activation area (transparent, placed last to be on top) */}
+      {hoverEnabled && (
+        <Rect
+          x={-(hoverSize - size) / 2}
+          y={-(hoverSize - size) / 2}
+          width={hoverSize}
+          height={hoverSize}
+          fill={'rgba(0,0,0,0.001)'}
+          listening={true}
+          onMouseEnter={(e) => {
+            e.cancelBubble = true;
+            const now = Date.now();
+            if (now - lastHoverRollTimeRef.current < hoverDebounceMs) return;
+            if (!die.isRolling) {
+              lastHoverRollTimeRef.current = now;
+              setCurrentRollingFace(onRoll(die.id));
+            }
+          }}
+          onMouseMove={(e) => {
+            e.cancelBubble = true;
+            const now = Date.now();
+            if (now - lastHoverRollTimeRef.current < hoverDebounceMs) return;
+            if (!die.isRolling) {
+              lastHoverRollTimeRef.current = now;
+              setCurrentRollingFace(onRoll(die.id));
+            }
+          }}
+          onTouchStart={(e) => {
+            e.cancelBubble = true;
+            const now = Date.now();
+            if (now - lastHoverRollTimeRef.current < hoverDebounceMs) return;
+            if (!die.isRolling) {
+              lastHoverRollTimeRef.current = now;
+              setCurrentRollingFace(onRoll(die.id));
+            }
+          }}
+        />
+      )}
     </Group>
   );
 };

@@ -259,6 +259,9 @@ const SkillTreeModal: React.FC = () => {
                         onMouseEnter={() => setHoveredNode(node.id)}
                         onMouseLeave={() => setHoveredNode(null)}
                       >
+                        {purchasedSkills[node.id] && (
+                          <div className="absolute -inset-1 rounded-lg border-2 border-yellow-400 pointer-events-none shadow-[0_0_12px_rgba(250,204,21,0.8)]" />
+                        )}
                         <div className="text-center">
                           <div className="text-lg">{getNodeIcon(node.id)}</div>
                           {status === 'locked' && <div className="text-xs">🔒</div>}
